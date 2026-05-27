@@ -7,6 +7,25 @@ import type {
     StripeEvent,
 } from '@craft/types';
 
+/**
+ * PaymentService
+ *
+ * Handles Stripe payment processing with idempotency guarantees.
+ *
+ * Idempotency Contract:
+ *   - Webhook handlers are idempotent: processing the same event multiple times
+ *     results in the same final database state
+ *   - Event ID is used as deduplication key
+ *   - Upsert operations ensure duplicate deliveries don't create duplicate records
+ *   - Safe for retry scenarios and network partitions
+ *
+ * Webhook Delivery Guarantees:
+ *   - At-least-once delivery: events may be delivered multiple times
+ *   - Out-of-order delivery: events may arrive out of sequence
+ *   - Duplicate delivery: same event ID may be processed multiple times
+ *
+ * All webhook handlers must be idempotent and use event ID for deduplication.
+ */
 export class PaymentService {
     /**
      * Create a Stripe checkout session for subscription
@@ -126,6 +145,10 @@ export class PaymentService {
 
     /**
      * Handle Stripe webhook events
+     *
+     * IDEMPOTENT: Safe to call multiple times with the same event.
+     * Uses event.id as deduplication key.
+     * Upsert operations ensure duplicate deliveries don't create duplicates.
      */
     async handleWebhook(event: StripeEvent): Promise<void> {
         const supabase = createClient();
