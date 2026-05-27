@@ -12,6 +12,52 @@ The deployment detail page gives users a single-pane view of everything relevant
 
 ---
 
+## Deployment Status State Machine
+
+The deployment lifecycle follows a strict forward-only state machine with no backtracking. Once a terminal state (completed or failed) is reached, no further transitions occur.
+
+### Valid State Transitions
+
+```
+pending
+  ├─→ generating
+  │     ├─→ creating_repo
+  │     │     ├─→ pushing_code
+  │     │     │     ├─→ deploying
+  │     │     │     │     ├─→ completed (terminal)
+  │     │     │     │     └─→ failed (terminal)
+  │     │     │     └─→ failed (terminal)
+  │     │     └─→ failed (terminal)
+  │     └─→ failed (terminal)
+  └─→ failed (terminal)
+```
+
+### Transition Rules
+
+| From | To | Valid | Reason |
+|------|-----|-------|--------|
+| pending | generating | ✓ | Start code generation |
+| pending | failed | ✓ | Immediate failure (e.g., validation) |
+| generating | creating_repo | ✓ | Proceed to repo creation |
+| generating | failed | ✓ | Generation failed |
+| creating_repo | pushing_code | ✓ | Proceed to code push |
+| creating_repo | failed | ✓ | Repo creation failed |
+| pushing_code | deploying | ✓ | Proceed to deployment |
+| pushing_code | failed | ✓ | Push failed |
+| deploying | completed | ✓ | Deployment succeeded |
+| deploying | failed | ✓ | Deployment failed |
+| completed | * | ✗ | Terminal state, no transitions |
+| failed | * | ✗ | Terminal state, no transitions |
+
+### Implementation Notes
+
+- No state can skip stages (e.g., pending → deploying is invalid)
+- No state can transition backward (e.g., deploying → generating is invalid)
+- Terminal states (completed, failed) accept no further transitions
+- All transitions are persisted to the database; invalid transitions are rejected at the service layer
+
+---
+
 ## Page Sections
 
 ### 1. Header
