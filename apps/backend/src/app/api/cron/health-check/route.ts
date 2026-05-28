@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { healthMonitorService } from '@/services/health-monitor.service';
 import { VercelService } from '@/services/vercel.service';
+import { withCronAuth } from '@/lib/api/cron-auth';
 
 /**
  * Cron endpoint to check health of all deployments
@@ -9,16 +10,8 @@ import { VercelService } from '@/services/vercel.service';
  * Vercel Cron: https://vercel.com/docs/cron-jobs
  * Configure in vercel.json with crons array containing path and schedule.
  */
-export async function GET(req: NextRequest) {
+async function handleHealthCheck(req: NextRequest) {
     try {
-        // Verify cron secret to prevent unauthorized access
-        const authHeader = req.headers.get('authorization');
-        const cronSecret = process.env.CRON_SECRET;
-
-        if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
         console.log('Running health check for all deployments...');
 
         const results = await healthMonitorService.checkAllDeployments();
@@ -44,3 +37,5 @@ export async function GET(req: NextRequest) {
         );
     }
 }
+
+export const GET = withCronAuth(handleHealthCheck);
